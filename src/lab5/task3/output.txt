@@ -1,0 +1,6 @@
+device-003;90.0
+device-005;95.0
+device-001;100.0
+device-006;100.0
+device-004;105.0
+device-002;110.0

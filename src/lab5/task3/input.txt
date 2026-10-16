@@ -1,0 +1,8 @@
+K=50
+device-001;100
+device-002;110
+device-003;90
+device-004;105
+device-005;95
+device-006;100
+device-outlier;200
