@@ -14,22 +14,28 @@ import java.util.regex.Pattern;
 
 /** Валідатор, який кешує reflection-метадані для кожного типу. */
 public final class CachedValidationService implements EntityValidator {
+    // ConcurrentHashMap дозволяє безпечно користуватися сервісом одночасно з кількох потоків.
+    // Ключ — клас об'єкта, значення — один раз побудована структура його анотацій і полів.
     private final ConcurrentMap<Class<?>, ClassValidationMetadata> metadataCache = new ConcurrentHashMap<>();
 
     @Override
     public ValidationResult validate(Object entity) {
         ValidationResult result = new ValidationResult();
+        // Для null-об'єкта неможливо визначити клас і підібрати відповідні метадані.
         if (entity == null) {
             result.addError("entity", "Об'єкт для перевірки не може бути null");
             return result;
         }
 
+        // Метадані будуються лише при першій появі типу, а далі беруться з кешу.
         ClassValidationMetadata metadata = metadataCache.computeIfAbsent(
                 entity.getClass(), ClassValidationMetadata::build);
+        // Помилки структури типу додаються до результату так само, як помилки значень.
         for (ValidationError error : metadata.configurationErrors()) {
             result.addError(error.fieldName(), error.message());
         }
 
+        // Reflection-структура вже підготовлена; зчитуємо лише поточні значення об'єкта.
         validateClassRule(entity, metadata, result);
         validateFields(entity, metadata, result);
         return result;
@@ -40,6 +46,7 @@ public final class CachedValidationService implements EntityValidator {
         return metadataCache.size();
     }
 
+    /** Перевіряє комплексне правило, використовуючи вже кешовані поля та параметри анотації. */
     private void validateClassRule(Object entity, ClassValidationMetadata metadata, ValidationResult result) {
         HighPowerZoneRule rule = metadata.classRule();
         Field powerField = metadata.powerField();
@@ -48,6 +55,7 @@ public final class CachedValidationService implements EntityValidator {
             return;
         }
 
+        // Значення залежать від конкретного об'єкта, тому їх читаємо при кожній валідації.
         Object powerValue = readField(powerField, entity, result);
         Object zoneValue = readField(zoneField, entity, result);
         if (powerValue == null || zoneValue == null) {
@@ -63,11 +71,13 @@ public final class CachedValidationService implements EntityValidator {
             return;
         }
 
+        // Порівнюємо потужність із порогом і перевіряємо, чи вказана дозволена зона.
         if (power.doubleValue() > rule.powerThreshold() && !rule.requiredZone().equals(zone)) {
             result.addError(rule.zoneField(), rule.message());
         }
     }
 
+    /** Перевіряє поля з кешованими анотаціями без повторного обходу всіх полів класу. */
     private void validateFields(Object entity, ClassValidationMetadata metadata, ValidationResult result) {
         for (FieldValidationMetadata fieldMetadata : metadata.validatedFields()) {
             Field field = fieldMetadata.field();
@@ -89,6 +99,7 @@ public final class CachedValidationService implements EntityValidator {
         }
     }
 
+    /** Перевіряє рядкове значення скомпільованим шаблоном, підготовленим один раз. */
     private void validateRegex(Field field, Object value, MatchesRegex annotation,
                                Pattern compiledPattern, ValidationResult result) {
         if (!(value instanceof String text)) {
@@ -101,6 +112,7 @@ public final class CachedValidationService implements EntityValidator {
         }
     }
 
+    /** Перевіряє, що числове значення скінченне і належить включному діапазону анотації. */
     private void validateRange(Field field, Object value, InRange annotation, ValidationResult result) {
         if (!(value instanceof Number number)) {
             result.addError(field.getName(), "Анотація @InRange застосовується до числового поля");
@@ -116,6 +128,7 @@ public final class CachedValidationService implements EntityValidator {
         }
     }
 
+    /** Читає поточне значення через кешований Field і додає помилку, якщо доступ неможливий. */
     private Object readField(Field field, Object entity, ValidationResult result) {
         try {
             return field.get(entity);

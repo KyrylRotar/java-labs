@@ -15,6 +15,7 @@ public final class ComponentEngine {
     }
 
     public static void run(String componentsPackage) throws Exception {
+        // Сканер повертає класи пакета; обробляємо лише позначені анотацією @Component.
         List<Class<?>> classes = ClassPathScanner.scan(componentsPackage);
         int processed = 0;
         System.out.println("Знайдено класів: " + classes.size());
@@ -26,7 +27,9 @@ public final class ComponentEngine {
                 continue;
             }
 
+            // Створюємо об'єкт без знання його конкретного типу на етапі компіляції.
             Object instance = createInstance(type);
+            // Для демонстрації встановлюємо значення єдиного поля екземпляра, враховуючи його тип.
             Field field = findInstanceField(type);
             Object value = sampleValue(field.getType(), component.name());
 
@@ -38,9 +41,11 @@ public final class ComponentEngine {
             System.out.println("\n== " + type.getSimpleName()
                     + " (name=" + component.name() + ", version=" + component.version() + ") ==");
             System.out.println("  Створено:        " + instance);
+            // Reflection дозволяє записати значення у private-поле компонента.
             field.set(instance, value);
             System.out.println("  Встановлено поле " + field.getName() + " = " + value);
 
+            // Метод дії знаходиться та викликається динамічно для кожного компонента.
             Method action = type.getDeclaredMethod("execute");
             if (!action.trySetAccessible()) {
                 throw new IllegalAccessException("Немає доступу до методу execute() у " + type.getName());
@@ -54,6 +59,7 @@ public final class ComponentEngine {
     }
 
     private static Object createInstance(Class<?> type) throws ReflectiveOperationException {
+        // За умовою кожен компонент має конструктор без параметрів.
         Constructor<?> constructor = type.getDeclaredConstructor();
         if (!constructor.trySetAccessible()) {
             throw new IllegalAccessException("Немає доступу до конструктора " + type.getName());
@@ -62,6 +68,7 @@ public final class ComponentEngine {
     }
 
     private static Field findInstanceField(Class<?> type) throws NoSuchFieldException {
+        // Ігноруємо статичні та синтетичні поля, щоб змінювати саме стан об'єкта.
         for (Field field : type.getDeclaredFields()) {
             if (!field.isSynthetic() && !Modifier.isStatic(field.getModifiers())) {
                 return field;
@@ -71,6 +78,7 @@ public final class ComponentEngine {
     }
 
     private static Object sampleValue(Class<?> fieldType, String componentName) {
+        // Підбираємо тестові значення для типів, використаних у прикладах компонентів.
         if (fieldType == String.class) {
             return componentName + "-demo";
         }
@@ -90,6 +98,7 @@ public final class ComponentEngine {
         try {
             action.invoke(instance);
         } catch (InvocationTargetException e) {
+            // Reflection обгортає виняток з execute(); повторно кидаємо початкову причину.
             Throwable cause = e.getCause();
             if (cause instanceof Exception exception) {
                 throw exception;

@@ -18,6 +18,7 @@ public final class ValidationBenchmark {
     }
 
     public static void main(String[] args) {
+        // Готуємо дані до вимірювання, щоб генерація не впливала на час роботи валідаторів.
         Device[] devices = generateDevices(ITERATIONS);
         EntityValidator regular = new ValidatorService();
         CachedValidationService cached = new CachedValidationService();
@@ -31,7 +32,7 @@ public final class ValidationBenchmark {
         long regularValidCount = -1;
         long cachedValidCount = -1;
 
-        // Для обох реалізацій використовуються ті самі об'єкти та кількість проходів.
+        // Повторюємо вимірювання і беремо найкращий час, зменшуючи вплив випадкових затримок ОС.
         for (int round = 0; round < MEASURED_ROUNDS; round++) {
             Measurement regularRun = measure(regular, devices);
             Measurement cachedRun = measure(cached, devices);
@@ -46,18 +47,22 @@ public final class ValidationBenchmark {
             }
         }
 
+        // Перевіряємо рівність списків помилок для кожного об'єкта, не лише кількість валідних.
         boolean resultsMatch = haveSameResults(regular, cached, devices);
         printResults(regularBestNanos, cachedBestNanos, regularValidCount,
                 cachedValidCount, resultsMatch, cached.cachedTypeCount());
     }
 
+    /** Створює відтворюваний набір даних для порівняння двох реалізацій валідатора. */
     private static Device[] generateDevices(int count) {
         Random random = new Random(13);
         Device[] devices = new Device[count];
         for (int i = 0; i < count; i++) {
+            // Частина серійних номерів має правильний формат, решта навмисно порушує regex.
             String serialNumber = random.nextBoolean()
                     ? "SN-ABC-%06d".formatted(random.nextInt(1_000_000))
                     : "INVALID-%d".formatted(i);
+            // Діапазон потужності включає як допустимі, так і надмірні значення.
             double powerKw = Math.round(random.nextDouble() * 600.0 * 10.0) / 10.0;
             String zone = random.nextBoolean() ? "HIGH_POWER_ZONE" : "GENERAL_ZONE";
             devices[i] = new Device(serialNumber, powerKw, zone,
@@ -66,12 +71,14 @@ public final class ValidationBenchmark {
         return devices;
     }
 
+    /** Вимірює час одного повного проходу та рахує валідні об'єкти. */
     private static Measurement measure(EntityValidator validator, Device[] devices) {
         long start = System.nanoTime();
         long validCount = runCount(validator, devices, devices.length);
         return new Measurement(System.nanoTime() - start, validCount);
     }
 
+    /** Виконує задану кількість валідацій і повертає число об'єктів без помилок. */
     private static long runCount(EntityValidator validator, Device[] devices, int count) {
         long validCount = 0;
         for (int i = 0; i < count; i++) {
@@ -95,6 +102,7 @@ public final class ValidationBenchmark {
         return true;
     }
 
+    /** Перетворює заміри на зрозумілу таблицю часу, швидкості та збігу результатів. */
     private static void printResults(long regularNanos, long cachedNanos,
                                      long regularValid, long cachedValid,
                                      boolean resultsMatch, int cachedTypeCount) {
@@ -117,6 +125,7 @@ public final class ValidationBenchmark {
         System.out.println("Типів у кеші: " + cachedTypeCount);
     }
 
+    /** Зберігає час виконання та кількість валідних результатів одного заміру. */
     private record Measurement(long elapsedNanos, long validCount) {
     }
 }
