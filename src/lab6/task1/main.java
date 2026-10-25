@@ -4,7 +4,7 @@ import lab6.task1.model.Device;
 
 import java.time.LocalDate;
 
-public class task1 {
+public class main {
     public static void main(String[] args) {
         Device validDevice = new Device(
                 "SN-ABC-123456",
